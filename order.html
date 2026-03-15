@@ -2,21 +2,18 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>填写订单</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>提交订单</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <style>
-        body { margin: 0; font-family: sans-serif; background-color: #f4f4f4; padding: 15px; }
+        body { margin: 0; font-family: -apple-system, sans-serif; background-color: #f4f4f4; padding: 15px; }
         .order-card { background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        .item { margin-bottom: 25px; }
-        label { display: block; font-weight: bold; margin-bottom: 10px; color: #333; font-size: 15px; }
-        input, select { width: 100%; padding: 14px; border: 1px solid #ccc; border-radius: 10px; box-sizing: border-box; font-size: 16px; outline: none; }
-        .price-row { display: flex; align-items: center; background: #f9f9f9; padding: 5px 15px; border-radius: 10px; border: 1px solid #ccc; }
-        #price-input { border: none; background: transparent; padding: 10px; font-size: 22px; font-weight: bold; flex: 1; }
-        .price-suffix { font-size: 20px; color: #000; font-weight: bold; }
-        .btn-submit { background: #007AFF; color: #fff; border: none; width: 100%; padding: 18px; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        .order-no { color: #007AFF; font-family: monospace; font-size: 20px; font-weight: bold; border: 2px dashed #007AFF; padding: 12px; border-radius: 10px; text-align: center; background: #f0f7ff; }
-        .worker-info { color: #666; font-size: 14px; margin-bottom: 5px; }
+        .item { margin-bottom: 20px; }
+        label { display: block; font-weight: bold; margin-bottom: 8px; font-size: 14px; }
+        input, select { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; font-size: 16px; outline: none; }
+        .btn-submit { background: #007AFF; color: #fff; border: none; width: 100%; padding: 16px; border-radius: 10px; font-size: 18px; font-weight: bold; cursor: pointer; }
+        .btn-submit:disabled { background: #ccc; }
+        .worker-box { background: #f0f7ff; padding: 10px; border-radius: 8px; font-weight: bold; color: #007AFF; margin-bottom: 10px; }
     </style>
 </head>
 <body>
@@ -24,118 +21,87 @@
 <div class="order-card">
     <div class="item">
         <label>服务人员：</label>
-        <div id="worker-name-display" style="font-size: 18px; color: #333; font-weight: bold;">正在识别...</div>
+        <div id="worker-name-display" class="worker-box">正在读取数据...</div>
     </div>
-
-    <div class="item">
-        <label>订单编号：</label>
-        <div id="order-no-display" class="order-no">生成中...</div>
-    </div>
-
-    <div class="item">
-        <label>类型：</label>
-        <select id="type-select">
-            <option value="1次">1次</option>
-            <option value="2次">2次</option>
-            <option value="包夜">包夜</option>
-        </select>
-    </div>
-
-    <div class="item">
-        <label>金额：</label>
-        <div class="price-row">
-            <span style="font-size:20px; font-weight:bold;">￥</span>
-            <input type="number" id="price-input" placeholder="输入数字">
-            <span class="price-suffix">00</span>
-        </div>
-    </div>
-
     <div class="item">
         <label>联系方式：</label>
-        <input type="text" id="contact-input" placeholder="输入 微信 / QQ / 手机号">
+        <input type="text" id="contact-input" placeholder="微信 / 手机号">
     </div>
-
     <div class="item">
         <label>服务地点：</label>
         <select id="region-select">
-            <option value="">点击选择地点</option>
+            <option value="">点击选择</option>
             <option value="上海">上海</option>
-            <option value="浙江省">浙江省</option>
-            <option value="江苏省">江苏省</option>
+            <option value="浙江">浙江</option>
+            <option value="江苏">江苏</option>
         </select>
     </div>
-
     <button id="submit-btn" class="btn-submit" onclick="submitOrder()">确认提交订单</button>
 </div>
 
 <script>
     const SUPABASE_URL = 'https://rdqnfgsichwzxrvzluyg.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_lpKx8N7N6s3JNKbcmqyBGQ_to3pZXQk';
-    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    
+    let supabaseClient;
 
-    // 1. 从 URL 获取 ID 并查询对应的名字
+    // 关键改进：等待库加载完成后再初始化
+    function initSupabase() {
+        if (typeof supabase !== 'undefined') {
+            supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+            getWorkerName();
+        } else {
+            // 如果没加载完，等0.5秒再试
+            setTimeout(initSupabase, 500);
+        }
+    }
+
     const urlParams = new URLSearchParams(window.location.search);
     const postId = urlParams.get('id');
-    let currentWorkerName = "未知";
 
     async function getWorkerName() {
-        if (!postId) {
-            document.getElementById('worker-name-display').innerText = "未选择人员";
-            return;
-        }
-        const { data } = await supabaseClient.from('media_posts').select('bio').eq('id', postId).single();
-        if (data) {
-            // 这里假设 bio 的第一行或前几个字是名字，或者我们可以根据你的需求调整
-            currentWorkerName = data.bio.split('\n')[0].substring(0, 10); 
-            document.getElementById('worker-name-display').innerText = currentWorkerName;
+        if (!postId || !supabaseClient) return;
+        try {
+            const { data } = await supabaseClient.from('media_posts').select('bio').eq('id', postId).single();
+            if (data) {
+                document.getElementById('worker-name-display').innerText = data.bio.split('\n')[0].substring(0, 15);
+            }
+        } catch (e) {
+            console.log("获取名字失败");
         }
     }
-    getWorkerName();
 
-    // 2. 生成随机单号
-    function generateOrderNo() {
-        const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        let res = "";
-        for(let i=0; i<3; i++) res += letters[Math.floor(Math.random()*26)];
-        res += Math.floor(10000 + Math.random() * 90000);
-        return res;
-    }
-    const currentOrderNo = generateOrderNo();
-    document.getElementById('order-no-display').innerText = currentOrderNo;
-
-    // 3. 提交订单
     async function submitOrder() {
-        const priceValue = document.getElementById('price-input').value;
+        if (!supabaseClient) return alert("系统正在初始化，请稍后");
+        
         const contact = document.getElementById('contact-input').value;
         const region = document.getElementById('region-select').value;
-        const type = document.getElementById('type-select').value;
-
-        if(!priceValue || !contact || !region) return alert("请完整填写信息");
+        if(!contact || !region) return alert("请填写完整信息");
 
         const btn = document.getElementById('submit-btn');
         btn.disabled = true;
-        btn.innerText = "正在提交...";
+        btn.innerText = "提交中...";
 
         try {
-            const { error } = await supabaseClient
-                .from('orders')
-                .insert([{
-                    order_id: currentOrderNo,
-                    worker_name: currentWorkerName, // 保存人名
-                    service_type: type,
-                    price: priceValue + "00",
-                    contact: contact,
-                    region: region
-                }]);
+            const { error } = await supabaseClient.from('orders').insert([{
+                order_id: "SN" + Date.now().toString().slice(-6),
+                worker_name: document.getElementById('worker-name-display').innerText,
+                contact: contact,
+                region: region
+            }]);
 
             if (error) throw error;
-            alert("✅ 订单提交成功！\n人员：" + currentWorkerName);
-            window.location.assign("./index.html");
+            alert("✅ 订单提交成功！");
+            window.location.href = "index.html";
         } catch (err) {
-            alert("提交失败: " + err.message);
+            alert("提交失败：" + err.message);
             btn.disabled = false;
+            btn.innerText = "重新提交";
         }
     }
+
+    // 页面加载后启动初始化
+    window.onload = initSupabase;
 </script>
 </body>
 </html>
