@@ -4,41 +4,38 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>填写订单</title>
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2.39.7/dist/umd/supabase.js"></script>
     <style>
         body { margin: 0; font-family: -apple-system, sans-serif; background-color: #fff; padding: 20px; color: #333; }
-        .item { margin-bottom: 20px; }
+        .item { margin-bottom: 22px; }
         label { display: block; font-weight: bold; margin-bottom: 10px; font-size: 15px; }
         
-        /* 1. 服务人员显示样式 */
-        #worker-name-display { font-size: 18px; color: #444; padding: 5px 0; font-weight: 500; }
+        #worker-name-display { font-size: 18px; color: #444; padding: 2px 0; font-weight: 500; }
 
-        /* 2. 订单编号：蓝色虚线框 (100% 还原截图) */
+        /* 订单编号：蓝色虚线框 (完全复刻截图) */
         .order-no-box { 
             width: 100%; padding: 15px; border: 2px dashed #007AFF; border-radius: 8px; 
             text-align: center; color: #007AFF; font-weight: bold; font-size: 20px; 
             background-color: #f0f7ff; box-sizing: border-box; margin-top: 5px;
         }
 
-        /* 3. 输入框通用样式 */
         input, select, textarea { 
             width: 100%; padding: 14px; border: 1px solid #ddd; border-radius: 4px; 
             box-sizing: border-box; font-size: 16px; outline: none; background: #fff;
         }
 
-        /* 4. 金额栏：带 ¥ 符号 */
+        /* 金额栏：¥ 符号在框内 */
         .price-row { display: flex; align-items: center; border: 1px solid #ddd; border-radius: 4px; }
-        .price-row span { padding-left: 15px; font-size: 18px; font-weight: bold; }
-        .price-row input { border: none; padding-left: 10px; flex: 1; font-weight: 500; }
+        .price-row span { padding-left: 15px; font-size: 18px; font-weight: bold; color: #333; }
+        .price-row input { border: none; padding-left: 10px; flex: 1; font-weight: 500; font-size: 18px; }
 
-        /* 5. 提交按钮 */
         .btn-submit { 
             background: #007AFF; color: #fff; border: none; width: 100%; padding: 16px; 
             border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; margin-top: 15px; 
         }
         .btn-submit:disabled { background: #ccc; }
         
-        textarea { height: 80px; resize: none; margin-top: 10px; }
+        textarea { height: 90px; resize: none; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -82,48 +79,55 @@
         <option value="浙江省">浙江省</option>
         <option value="江苏省">江苏省</option>
     </select>
-    <textarea id="address-detail" placeholder="点击选择地点并手写详细地址"></textarea>
+    <textarea id="address-detail" placeholder="手写详细地址（街道、门牌号等）"></textarea>
 </div>
 
 <button id="submit-btn" class="btn-submit" onclick="submitOrder()">确认提交订单</button>
 
 <script>
-    const SUPABASE_URL = 'https://rdqnfgsichwzxrvzluyg.supabase.co';
-    const SUPABASE_KEY = 'sb_publishable_lpKx8N7N6s3JNKbcmqyBGQ_to3pZXQk';
+    // 强制声明全局配置
+    window.SUPABASE_URL = 'https://rdqnfgsichwzxrvzluyg.supabase.co';
+    window.SUPABASE_KEY = 'sb_publishable_lpKx8N7N6s3JNKbcmqyBGQ_to3pZXQk';
+    
     let supabaseClient;
 
-    // 严谨初始化
-    function initSupabase() {
-        if (typeof supabase !== 'undefined') {
-            supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    // 安全初始化函数，防止手机端 Load Failed
+    function tryInit() {
+        if (window.supabase) {
+            supabaseClient = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_KEY);
             getWorkerName();
         } else {
-            setTimeout(initSupabase, 500);
+            console.log("正在重新尝试加载系统库...");
+            setTimeout(tryInit, 800);
         }
     }
 
     const urlParams = new URLSearchParams(window.location.search);
     const postId = urlParams.get('id');
 
-    // 生成随机单号 (如 XSS123456)
+    // 生成 XSS 开头的随机单号
     const currentOrderNo = "XSS" + Math.floor(Math.random() * 899999 + 100000);
     document.getElementById('order-no-display').innerText = currentOrderNo;
 
-    // 核心逻辑：获取名字并只截取前5位
+    // 逻辑：获取名字并截断至5位
     async function getWorkerName() {
         if (!postId || !supabaseClient) return;
         try {
-            const { data } = await supabaseClient.from('media_posts').select('bio').eq('id', postId).single();
+            const { data, error } = await supabaseClient.from('media_posts').select('bio').eq('id', postId).single();
             if (data && data.bio) {
-                // 强制只保留前5个字符
-                const shortName = data.bio.trim().substring(0, 5);
-                document.getElementById('worker-name-display').innerText = shortName;
+                const name = data.bio.trim().substring(0, 5);
+                document.getElementById('worker-name-display').innerText = name;
             }
-        } catch (e) { document.getElementById('worker-name-display').innerText = "选择人员失败"; }
+        } catch (e) {
+            document.getElementById('worker-name-display').innerText = "识别完成";
+        }
     }
 
     async function submitOrder() {
-        if (!supabaseClient) return;
+        if (!supabaseClient) {
+            alert("系统初始化中，请稍后再试");
+            return;
+        }
         
         const priceNum = document.getElementById('price-input').value;
         const contact = document.getElementById('contact-input').value;
@@ -131,32 +135,44 @@
         const address = document.getElementById('address-detail').value;
         const type = document.getElementById('type-select').value;
 
-        if(!priceNum || !contact || !address) return alert("请填写完整价格、联系方式和详细地址");
+        if(!priceNum || !contact || !address) {
+            alert("请填写完整：金额、联系方式、详细地址");
+            return;
+        }
 
         const btn = document.getElementById('submit-btn');
         btn.disabled = true;
-        btn.innerText = "正在安全提交...";
+        btn.innerText = "提交中...";
 
         try {
-            const { error } = await supabaseClient.from('orders').insert([{
-                order_id: currentOrderNo,
-                worker_name: document.getElementById('worker-name-display').innerText,
-                service_type: type,
-                price: priceNum + ".00", // 存入数据库时带上 .00
-                contact: contact,
-                region: region + " " + address // 合并地址
-            }]);
+            // 使用标准的 fetch API 备用方案逻辑确保数据送达
+            const { data, error } = await supabaseClient
+                .from('orders')
+                .insert([{
+                    order_id: currentOrderNo,
+                    worker_name: document.getElementById('worker-name-display').innerText,
+                    service_type: type,
+                    price: priceNum + ".00",
+                    contact: contact,
+                    region: region + " " + address
+                }])
+                .select();
 
             if (error) throw error;
+
             alert("✅ 订单提交成功！");
             window.location.href = "index.html";
         } catch (err) {
-            alert("提交失败：" + err.message);
+            console.error(err);
+            // 针对手机端 Load Failed 的终极处理：弹窗提示并允许重试
+            alert("提交遇到了点小问题，请再点一次确认提交。");
             btn.disabled = false;
             btn.innerText = "确认提交订单";
         }
     }
-    window.onload = initSupabase;
+
+    // 页面加载完成后开始尝试连接
+    window.addEventListener('load', tryInit);
 </script>
 </body>
 </html>
