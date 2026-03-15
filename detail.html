@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>人员详情</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { margin: 0; font-family: sans-serif; background-color: #fff; padding-bottom: 100px; }
+        .back-btn { position: fixed; top: 15px; left: 15px; background: rgba(0,0,0,0.5); color: #fff; padding: 8px 15px; border-radius: 20px; font-size: 14px; z-index: 10; text-decoration: none; }
+        .main-media { width: 100%; display: block; background-color: #000; min-height: 250px; }
+        .content-box { padding: 20px; }
+        .region-tag { color: #007AFF; font-weight: bold; margin-bottom: 10px; display: block; font-size: 14px; }
+        .bio-text { font-size: 17px; line-height: 1.6; color: #333; white-space: pre-wrap; word-wrap: break-word; }
+        .footer-action { position: fixed; bottom: 0; width: 100%; background: #fff; padding: 15px; border-top: 1px solid #eee; box-sizing: border-box; z-index: 100; }
+        .order-btn { background: #007AFF; color: #fff; text-align: center; padding: 16px; border-radius: 12px; font-weight: bold; cursor: pointer; display: block; text-decoration: none; font-size: 18px; box-shadow: 0 4px 12px rgba(0,122,255,0.3); }
+        .order-btn:active { background: #0056b3; transform: scale(0.98); }
+    </style>
+</head>
+<body>
+
+    <a href="index.html" class="back-btn">← 返回首页</a>
+
+    <div id="media-container">
+        </div>
+
+    <div class="content-box">
+        <span class="region-tag" id="region-display">正在获取位置...</span>
+        <div class="bio-text" id="bio-display">加载中...</div>
+    </div>
+
+    <div class="footer-action">
+        <a href="#" class="order-btn" onclick="forceGoToOrder(event)">立即下单 / 预约</a>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://rdqnfgsichwzxrvzluyg.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_lpKx8N7N6s3JNKbcmqyBGQ_to3pZXQk';
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const postId = urlParams.get('id');
+
+        // 执行跳转并传递 ID
+        function forceGoToOrder(e) {
+            e.preventDefault(); 
+            if (!postId) {
+                alert("未检测到人员 ID，请在首页点击照片进入");
+                return;
+            }
+            // 严谨的跳转路径
+            window.location.href = "order.html?id=" + postId; 
+        }
+
+        async function loadDetail() {
+            if (!postId) return;
+            try {
+                const { data, error } = await supabaseClient
+                    .from('media_posts')
+                    .select('*')
+                    .eq('id', postId)
+                    .single();
+
+                if (data) {
+                    const container = document.getElementById('media-container');
+                    if (data.media_type === 'video') {
+                        container.innerHTML = `<video src="${data.media_url}" class="main-media" controls autoplay muted playsinline></video>`;
+                    } else {
+                        container.innerHTML = `<img src="${data.media_url}" class="main-media">`;
+                    }
+                    document.getElementById('region-display').innerText = "服务地区：" + (data.region || "上海");
+                    document.getElementById('bio-display').innerText = data.bio || "暂无详细介绍";
+                }
+            } catch (err) {
+                console.error("加载详情错误:", err);
+            }
+        }
+        loadDetail();
+    </script>
+</body>
+</html>

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>订单管理系统</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: -apple-system, sans-serif; background-color: #f4f7f9; margin: 0; padding: 20px; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
+        .refresh-tag { font-size: 12px; color: #34c759; font-weight: bold; }
+        .order-container { display: grid; gap: 15px; }
+        .order-card { background: #fff; border-radius: 15px; padding: 18px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border-left: 6px solid #007AFF; position: relative; }
+        .worker-name { font-size: 20px; font-weight: bold; color: #007AFF; margin-bottom: 10px; display: block; }
+        .detail-item { margin-bottom: 6px; font-size: 15px; color: #444; }
+        .label { color: #888; width: 80px; display: inline-block; }
+        .btn-group { margin-top: 15px; }
+        .check-btn { width: 100%; background: #007AFF; color: #fff; border: none; padding: 15px; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: 16px; }
+        .check-btn:active { background: #0056b3; }
+        .order-time { font-size: 12px; color: #bbb; position: absolute; top: 18px; right: 18px; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h2 style="margin:0;">实时订单监控</h2>
+    <div id="status" class="refresh-tag">● 正在监控最新订单 (10秒刷新)</div>
+</div>
+
+<div id="order-list" class="order-container">
+    <div style="text-align:center; padding:50px; color:#999;">正在同步数据库...</div>
+</div>
+
+<script>
+    const SUPABASE_URL = 'https://rdqnfgsichwzxrvzluyg.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_lpKx8N7N6s3JNKbcmqyBGQ_to3pZXQk';
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    async function refreshOrders() {
+        const { data, error } = await supabaseClient
+            .from('orders')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) return;
+
+        const list = document.getElementById('order-list');
+        if (!data || data.length === 0) {
+            list.innerHTML = '<div style="text-align:center; padding:50px; color:#999;">暂无新订单</div>';
+            return;
+        }
+
+        list.innerHTML = '';
+        data.forEach(order => {
+            const timeStr = new Date(order.created_at).toLocaleString();
+            // 构建转发文本
+            const summaryText = `【新订单】\n服务人员：${order.worker_name}\n地点：${order.region}\n联系：${order.contact}\n详情：${order.price} / ${order.service_type}\n时间：${timeStr}`;
+
+            const card = document.createElement('div');
+            card.className = 'order-card';
+            card.innerHTML = `
+                <span class="order-time">${timeStr}</span>
+                <span class="worker-name">${order.worker_name || '未命名'}</span>
+                <div class="detail-item"><span class="label">联系:</span><strong>${order.contact}</strong></div>
+                <div class="detail-item"><span class="label">地点:</span>${order.region}</div>
+                <div class="detail-item"><span class="label">详情:</span>${order.price} / ${order.service_type}</div>
+                <div class="btn-group">
+                    <button class="check-btn" onclick="sendToPhone('${encodeURIComponent(summaryText)}')">检查并转发给：15940021771</button>
+                </div>
+            `;
+            list.appendChild(card);
+        });
+    }
+
+    // 唤起短信并自动填写内容
+    function sendToPhone(encodedText) {
+        const text = decodeURIComponent(encodedText);
+        const myPhone = "15940021771"; 
+        
+        // 自动复制到剪贴板备份（防止部分浏览器无法唤起短信）
+        navigator.clipboard.writeText(text).then(() => {
+            // 跳转短信协议
+            // iOS 使用 &body，Android 建议使用 ?body，这里采用通用的 ?body
+            window.location.href = "sms:" + myPhone + "?body=" + encodeURIComponent(text);
+        });
+    }
+
+    refreshOrders();
+    setInterval(refreshOrders, 10000); // 10秒自动刷新一次
+</script>
+
+</body>
+</html>

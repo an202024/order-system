@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>系统首页</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { margin: 0; font-family: sans-serif; background-color: #f8f9fa; }
+        .header { background: #fff; padding: 15px; border-bottom: 1px solid #eee; }
+        .address-bar { border: 1.5px solid #007AFF; border-radius: 8px; padding: 8px; display: flex; align-items: center; }
+        .address-select { border: none; width: 100%; font-size: 16px; outline: none; background: transparent; -webkit-appearance: none; }
+        .photo-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; padding: 15px; padding-bottom: 100px; }
+        .photo-card { aspect-ratio: 1 / 1; background: #fff; border: 1px solid #ddd; border-radius: 12px; display: flex; justify-content: center; align-items: center; cursor: pointer; overflow: hidden; }
+        .photo-card img, .photo-card video { width: 100%; height: 100%; object-fit: cover; }
+        .footer { position: fixed; bottom: 0; width: 100%; background: #fff; padding: 15px; border-top: 1px solid #eee; box-sizing: border-box; }
+        .upload-btn { background: #007AFF; color: white; text-align: center; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="address-bar">
+            <span style="color:#007AFF; font-weight:bold; margin-right:5px;">地区：</span>
+            <select id="region-select" class="address-select">
+                <option value="上海">上海</option>
+                <option value="浙江省">浙江省</option>
+                <option value="江苏省">江苏省</option>
+            </select>
+        </div>
+    </div>
+    <div class="photo-grid" id="grid">
+        <div class="photo-card">正在加载内容...</div>
+    </div>
+    <div class="footer">
+        <div class="upload-btn" onclick="goAdmin()">上传照片 +</div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://rdqnfgsichwzxrvzluyg.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_lpKx8N7N6s3JNKbcmqyBGQ_to3pZXQk';
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        async function loadMedia() {
+            const { data, error } = await supabaseClient.from('media_posts').select('*').order('created_at', { ascending: false });
+            const grid = document.getElementById('grid');
+            if (data && data.length > 0) {
+                grid.innerHTML = '';
+                data.forEach(item => {
+                    const card = document.createElement('div');
+                    card.className = 'photo-card';
+                    card.onclick = () => window.location.assign(`./detail.html?id=${item.id}`);
+                    card.innerHTML = item.media_type === 'video' ? `<video src="${item.media_url}" muted></video>` : `<img src="${item.media_url}">`;
+                    grid.appendChild(card);
+                });
+            } else {
+                grid.innerHTML = '<div style="padding:20px; color:#999;">暂无照片，请先上传</div>';
+            }
+        }
+
+        function goAdmin() {
+            if (prompt("请输入授权密码：") === "8888") window.location.assign("./upload.html");
+        }
+
+        loadMedia();
+    </script>
+</body>
+</html>

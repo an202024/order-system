@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>上传管理</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { margin: 0; font-family: sans-serif; background-color: #f4f4f4; padding: 20px; }
+        .card { background: #fff; padding: 20px; border-radius: 12px; }
+        .upload-box { border: 2px dashed #007AFF; padding: 30px; text-align: center; border-radius: 8px; cursor: pointer; margin-bottom: 20px; color: #007AFF; }
+        .preview-img { width: 100%; border-radius: 8px; display: none; margin-bottom: 20px; }
+        textarea { width: 100%; height: 80px; padding: 10px; box-sizing: border-box; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 20px; }
+        .btn { background: #007AFF; color: #fff; border: none; width: 100%; padding: 15px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h3>发布新内容</h3>
+    <div class="upload-box" onclick="document.getElementById('file-input').click()">
+        <span id="box-text">+ 点击选择照片或视频</span>
+        <input type="file" id="file-input" style="display:none;" accept="image/*,video/*">
+    </div>
+    <img id="preview" class="preview-img">
+    <textarea id="bio-input" placeholder="请输入个人介绍内容..."></textarea>
+    <button id="submit-btn" class="btn" onclick="uploadData()">确认发布</button>
+</div>
+
+<script>
+    const SUPABASE_URL = 'https://rdqnfgsichwzxrvzluyg.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_lpKx8N7N6s3JNKbcmqyBGQ_to3pZXQk';
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    let selectedFile = null;
+
+    document.getElementById('file-input').onchange = (e) => {
+        selectedFile = e.target.files[0];
+        if (!selectedFile) return;
+        document.getElementById('preview').src = URL.createObjectURL(selectedFile);
+        document.getElementById('preview').style.display = 'block';
+        document.getElementById('box-text').innerText = "已选择: " + selectedFile.name;
+    };
+
+    async function uploadData() {
+        if (!selectedFile) return alert("请先选图");
+        const btn = document.getElementById('submit-btn');
+        btn.disabled = true;
+        btn.innerText = "正在发布...";
+
+        try {
+            const fileName = Date.now() + "_" + selectedFile.name;
+            // 1. 上传文件
+            const { data: upData, error: upErr } = await supabaseClient.storage.from('media').upload(fileName, selectedFile);
+            if (upErr) throw upErr;
+
+            // 2. 获取链接
+            const { data: urlData } = supabaseClient.storage.from('media').getPublicUrl(fileName);
+
+            // 3. 写入账本
+            const { error: dbErr } = await supabaseClient.from('media_posts').insert([{
+                media_url: urlData.publicUrl,
+                media_type: selectedFile.type.startsWith('video') ? 'video' : 'image',
+                bio: document.getElementById('bio-input').value,
+                region: '上海'
+            }]);
+            if (dbErr) throw dbErr;
+
+            alert("发布成功！照片已同步至首页");
+            window.location.assign("./index.html");
+        } catch (err) {
+            alert("错误提示: " + err.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerText = "确认发布";
+        }
+    }
+</script>
+</body>
+</html>
