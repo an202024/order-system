@@ -3,55 +3,101 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>提交订单</title>
+    <title>填写订单</title>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <style>
-        body { margin: 0; font-family: -apple-system, sans-serif; background-color: #f4f4f4; padding: 15px; }
-        .order-card { background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        body { margin: 0; font-family: -apple-system, sans-serif; background-color: #fff; padding: 20px; color: #333; }
         .item { margin-bottom: 20px; }
-        label { display: block; font-weight: bold; margin-bottom: 8px; font-size: 14px; }
-        input, select { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; font-size: 16px; outline: none; }
-        .btn-submit { background: #007AFF; color: #fff; border: none; width: 100%; padding: 16px; border-radius: 10px; font-size: 18px; font-weight: bold; cursor: pointer; }
+        label { display: block; font-weight: bold; margin-bottom: 10px; font-size: 15px; }
+        
+        /* 1. 服务人员显示样式 */
+        #worker-name-display { font-size: 18px; color: #444; padding: 5px 0; font-weight: 500; }
+
+        /* 2. 订单编号：蓝色虚线框 (100% 还原截图) */
+        .order-no-box { 
+            width: 100%; padding: 15px; border: 2px dashed #007AFF; border-radius: 8px; 
+            text-align: center; color: #007AFF; font-weight: bold; font-size: 20px; 
+            background-color: #f0f7ff; box-sizing: border-box; margin-top: 5px;
+        }
+
+        /* 3. 输入框通用样式 */
+        input, select, textarea { 
+            width: 100%; padding: 14px; border: 1px solid #ddd; border-radius: 4px; 
+            box-sizing: border-box; font-size: 16px; outline: none; background: #fff;
+        }
+
+        /* 4. 金额栏：带 ¥ 符号 */
+        .price-row { display: flex; align-items: center; border: 1px solid #ddd; border-radius: 4px; }
+        .price-row span { padding-left: 15px; font-size: 18px; font-weight: bold; }
+        .price-row input { border: none; padding-left: 10px; flex: 1; font-weight: 500; }
+
+        /* 5. 提交按钮 */
+        .btn-submit { 
+            background: #007AFF; color: #fff; border: none; width: 100%; padding: 16px; 
+            border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; margin-top: 15px; 
+        }
         .btn-submit:disabled { background: #ccc; }
-        .worker-box { background: #f0f7ff; padding: 10px; border-radius: 8px; font-weight: bold; color: #007AFF; margin-bottom: 10px; }
+        
+        textarea { height: 80px; resize: none; margin-top: 10px; }
     </style>
 </head>
 <body>
 
-<div class="order-card">
-    <div class="item">
-        <label>服务人员：</label>
-        <div id="worker-name-display" class="worker-box">正在读取数据...</div>
-    </div>
-    <div class="item">
-        <label>联系方式：</label>
-        <input type="text" id="contact-input" placeholder="微信 / 手机号">
-    </div>
-    <div class="item">
-        <label>服务地点：</label>
-        <select id="region-select">
-            <option value="">点击选择</option>
-            <option value="上海">上海</option>
-            <option value="浙江">浙江</option>
-            <option value="江苏">江苏</option>
-        </select>
-    </div>
-    <button id="submit-btn" class="btn-submit" onclick="submitOrder()">确认提交订单</button>
+<div class="item">
+    <label>服务人员：</label>
+    <div id="worker-name-display">读取中...</div>
 </div>
+
+<div class="item">
+    <label>订单编号：</label>
+    <div id="order-no-display" class="order-no-box">------</div>
+</div>
+
+<div class="item">
+    <label>类型：</label>
+    <select id="type-select">
+        <option value="1次">1次</option>
+        <option value="2次">2次</option>
+        <option value="包夜">包夜</option>
+    </select>
+</div>
+
+<div class="item">
+    <label>金额：</label>
+    <div class="price-row">
+        <span>¥</span>
+        <input type="number" id="price-input" placeholder="输入数字" pattern="[0-9]*">
+    </div>
+</div>
+
+<div class="item">
+    <label>联系方式：</label>
+    <input type="text" id="contact-input" placeholder="输入 微信 / QQ / 手机号">
+</div>
+
+<div class="item">
+    <label>服务地点：</label>
+    <select id="region-select">
+        <option value="上海">上海</option>
+        <option value="浙江省">浙江省</option>
+        <option value="江苏省">江苏省</option>
+    </select>
+    <textarea id="address-detail" placeholder="点击选择地点并手写详细地址"></textarea>
+</div>
+
+<button id="submit-btn" class="btn-submit" onclick="submitOrder()">确认提交订单</button>
 
 <script>
     const SUPABASE_URL = 'https://rdqnfgsichwzxrvzluyg.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_lpKx8N7N6s3JNKbcmqyBGQ_to3pZXQk';
-    
     let supabaseClient;
 
-    // 关键改进：等待库加载完成后再初始化
+    // 严谨初始化
     function initSupabase() {
         if (typeof supabase !== 'undefined') {
             supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
             getWorkerName();
         } else {
-            // 如果没加载完，等0.5秒再试
             setTimeout(initSupabase, 500);
         }
     }
@@ -59,35 +105,46 @@
     const urlParams = new URLSearchParams(window.location.search);
     const postId = urlParams.get('id');
 
+    // 生成随机单号 (如 XSS123456)
+    const currentOrderNo = "XSS" + Math.floor(Math.random() * 899999 + 100000);
+    document.getElementById('order-no-display').innerText = currentOrderNo;
+
+    // 核心逻辑：获取名字并只截取前5位
     async function getWorkerName() {
         if (!postId || !supabaseClient) return;
         try {
             const { data } = await supabaseClient.from('media_posts').select('bio').eq('id', postId).single();
-            if (data) {
-                document.getElementById('worker-name-display').innerText = data.bio.split('\n')[0].substring(0, 15);
+            if (data && data.bio) {
+                // 强制只保留前5个字符
+                const shortName = data.bio.trim().substring(0, 5);
+                document.getElementById('worker-name-display').innerText = shortName;
             }
-        } catch (e) {
-            console.log("获取名字失败");
-        }
+        } catch (e) { document.getElementById('worker-name-display').innerText = "选择人员失败"; }
     }
 
     async function submitOrder() {
-        if (!supabaseClient) return alert("系统正在初始化，请稍后");
+        if (!supabaseClient) return;
         
+        const priceNum = document.getElementById('price-input').value;
         const contact = document.getElementById('contact-input').value;
         const region = document.getElementById('region-select').value;
-        if(!contact || !region) return alert("请填写完整信息");
+        const address = document.getElementById('address-detail').value;
+        const type = document.getElementById('type-select').value;
+
+        if(!priceNum || !contact || !address) return alert("请填写完整价格、联系方式和详细地址");
 
         const btn = document.getElementById('submit-btn');
         btn.disabled = true;
-        btn.innerText = "提交中...";
+        btn.innerText = "正在安全提交...";
 
         try {
             const { error } = await supabaseClient.from('orders').insert([{
-                order_id: "SN" + Date.now().toString().slice(-6),
+                order_id: currentOrderNo,
                 worker_name: document.getElementById('worker-name-display').innerText,
+                service_type: type,
+                price: priceNum + ".00", // 存入数据库时带上 .00
                 contact: contact,
-                region: region
+                region: region + " " + address // 合并地址
             }]);
 
             if (error) throw error;
@@ -96,11 +153,9 @@
         } catch (err) {
             alert("提交失败：" + err.message);
             btn.disabled = false;
-            btn.innerText = "重新提交";
+            btn.innerText = "确认提交订单";
         }
     }
-
-    // 页面加载后启动初始化
     window.onload = initSupabase;
 </script>
 </body>
